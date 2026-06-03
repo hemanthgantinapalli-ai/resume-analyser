@@ -496,3 +496,10 @@ h1, h2, h3, h4, h5, h6 {
   body { background: #fff !important; color: #000 !important; }
   .no-print { display: none !important; }
 }
+
+/* ============================================================
+   HIDE NEXTJS DEV TOOLS BADGE
+   ============================================================ */
+#devtools-indicator {
+  display: none !important;
+}

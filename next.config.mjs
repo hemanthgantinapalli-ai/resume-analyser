@@ -12,6 +12,10 @@ const nextConfig = {
   devIndicators: {
     buildActivity: false,
     appIsrStatus: false,
+    buildActivityPosition: false,
+  },
+  experimental: {
+    disableOptimizedPackageImports: false,
   },
 };
 
