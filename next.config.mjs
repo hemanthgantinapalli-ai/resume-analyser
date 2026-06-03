@@ -9,10 +9,7 @@ const nextConfig = {
     // Set the root to the current project directory to bypass warning
     root: resolve(__dirname),
   },
-  devIndicators: {
-    buildActivity: false,
-    appIsrStatus: false,
-  },
+
 };
 
 export default nextConfig;
