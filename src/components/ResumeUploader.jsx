@@ -31,7 +31,7 @@ export default function ResumeUploader() {
 
   return (
     <section className="upload-section max-w-3xl mx-auto my-12 p-8 bg-[#0a0a0f]/50 backdrop-blur-sm rounded-xl border border-white/5 shadow-xl animate-fade-up">
-      <h2 className="text-2xl font-bold text-white mb-4 text-center bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-500">
+      <h2 className="text-2xl font-bold text-white mb-4 text-center bg-clip-text bg-linear-to-r from-purple-400 to-indigo-500">
         Boost Your ATS Score
       </h2>
       <input
