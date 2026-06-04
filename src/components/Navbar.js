@@ -8,14 +8,14 @@ import { Sparkles, User, LogOut, Menu, X, ChevronDown, Zap, LayoutTemplate, Arro
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  
-  useEffect(() => {
-    const saved = window.localStorage.getItem("ai_resume_user");
-    if (saved) {
-      setUser(JSON.parse(saved));
+  // Initialize user state from localStorage to avoid setState in effect
+  const [user, setUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("ai_resume_user");
+      return saved ? JSON.parse(saved) : null;
     }
-  }, []);
+    return null;
+  });
   const [authModal, setAuthModal] = useState(false);
   const [authTab, setAuthTab] = useState("login");
   const [mobileOpen, setMobileOpen] = useState(false);
