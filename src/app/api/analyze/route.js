@@ -32,9 +32,55 @@ export async function POST(req) {
 
       try {
         if (fileExtension === "pdf") {
-          const pdf = require("pdf-parse");
-          const parsed = await pdf(fileBuffer);
-          rawText = parsed.text || "";
+          // Dynamic import for pdf-parse with multiple fallback strategies
+          let pdfParsed = false;
+          
+          try {
+            const pdf = require("pdf-parse");
+            const parsed = await pdf(fileBuffer);
+            rawText = parsed.text || "";
+            pdfParsed = true;
+          } catch (pdfError) {
+            console.warn("pdf-parse primary attempt failed:", pdfError.message);
+          }
+
+          // If pdf-parse failed, try a lightweight text extraction from PDF buffer
+          if (!pdfParsed || !rawText.trim()) {
+            try {
+              // Attempt to extract readable text segments from the PDF binary
+              const bufferStr = fileBuffer.toString("utf8");
+              const textSegments = [];
+              
+              // Extract text between BT (Begin Text) and ET (End Text) operators
+              const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
+              let match;
+              while ((match = btEtRegex.exec(bufferStr)) !== null) {
+                const block = match[1];
+                // Extract text from Tj and TJ operators
+                const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g);
+                if (tjMatches) {
+                  tjMatches.forEach(m => {
+                    const text = m.match(/\(([^)]*)\)/)?.[1];
+                    if (text && text.trim()) textSegments.push(text.trim());
+                  });
+                }
+              }
+              
+              if (textSegments.length > 5) {
+                rawText = textSegments.join("\n");
+                pdfParsed = true;
+              }
+            } catch (fallbackError) {
+              console.warn("PDF text extraction fallback failed:", fallbackError.message);
+            }
+          }
+
+          // Final check: if we still have no text or the text looks like raw PDF code, fail gracefully
+          if (!pdfParsed || !rawText.trim()) {
+            return NextResponse.json({
+              error: "Could not extract readable text from this PDF. The file may be image-based (scanned) or use an unsupported encoding. Please try uploading a .docx version or a text-based PDF."
+            }, { status: 400 });
+          }
         } else if (fileExtension === "docx") {
           const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
           rawText = parsed.value || "";
@@ -43,8 +89,23 @@ export async function POST(req) {
           rawText = fileBuffer.toString("utf8");
         }
       } catch (parseError) {
-        console.error("Document parser failed. Trying raw text decode fallback:", parseError);
-        rawText = fileBuffer.toString("utf8").replace(/[^\x20-\x7E\r\n\t]/g, ""); // strip binary
+        console.error("Document parser failed:", parseError);
+        return NextResponse.json({
+          error: "Failed to parse the uploaded document. Please try a different file format (.docx or text-based .pdf)."
+        }, { status: 400 });
+      }
+
+      // Safety check: detect if extracted text is actually raw PDF source code
+      const looksLikePdfSource = (text) => {
+        const pdfIndicators = ["%PDF-", "endobj", "endstream", "/Type/Page", "0 obj", "/Font", "/MediaBox"];
+        const matchCount = pdfIndicators.filter(indicator => text.includes(indicator)).length;
+        return matchCount >= 3;
+      };
+
+      if (looksLikePdfSource(rawText)) {
+        return NextResponse.json({
+          error: "The PDF text extraction returned raw PDF code instead of readable content. This usually happens with scanned/image-based PDFs. Please upload a text-based PDF or a .docx file."
+        }, { status: 400 });
       }
     } else {
       // Direct JSON text testing

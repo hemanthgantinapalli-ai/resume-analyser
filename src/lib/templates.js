@@ -41,10 +41,10 @@ export const PREMIUM_TEMPLATES = [
     }
   },
   {
-    id: "corporate",
-    name: "Corporate Premium",
-    description: "Traditional corporate design template",
-    preview: "Corporate layout with header bar",
+    id: "skillsFirst",
+    name: "Skills-First Functional",
+    description: "Skills-focused functional design template",
+    preview: "Skills-first layout with prominent tech stack",
     styles: {
       bgColor: "#ffffff",
       accentColor: "#1e40af",
@@ -65,8 +65,8 @@ export const PREMIUM_TEMPLATES = [
     }
   },
   {
-    id: "minimal",
-    name: "Ultra Minimal",
+    id: "minimalist",
+    name: "Ultra Minimalist",
     description: "Extreme minimalism with maximum clarity",
     preview: "Minimal layout with pure typography",
     styles: {
@@ -113,10 +113,10 @@ export const PREMIUM_TEMPLATES = [
     }
   },
   {
-    id: "designer",
-    name: "Designer Portfolio",
-    description: "Visual design-focused template",
-    preview: "Designer layout with visual emphasis",
+    id: "chronological",
+    name: "Timeline Chronology",
+    description: "Visual timeline-focused design template",
+    preview: "Chronological layout with timeline nodes",
     styles: {
       bgColor: "#f3f4f6",
       accentColor: "#d946ef",
@@ -125,13 +125,25 @@ export const PREMIUM_TEMPLATES = [
     }
   },
   {
-    id: "hybrid",
-    name: "Hybrid Balanced",
+    id: "doubleColumn",
+    name: "Double Column Dense",
     description: "Balanced two-column design",
-    preview: "Hybrid layout with balanced columns",
+    preview: "Double-column layout with balanced sections",
     styles: {
       bgColor: "#ffffff",
       accentColor: "#7c3aed",
+      fontFamily: "font-sans",
+      fontSize: "text-sm"
+    }
+  },
+  {
+    id: "bold",
+    name: "Bold Professional",
+    description: "High contrast bold design with dark header banner",
+    preview: "Bold layout with dark accent header",
+    styles: {
+      bgColor: "#ffffff",
+      accentColor: "#334155",
       fontFamily: "font-sans",
       fontSize: "text-sm"
     }
