@@ -40,6 +40,13 @@ export async function analyzeResumeWithAI(resumeText, jobDescription = "") {
           }>;
           extractedKeywords: string[]; // Technical tools/skills found in the text
           suggestedKeywords: string[]; // Skills missing from the resume that would boost ATS scoring
+          professionalSummaryRewrite: string; // A strong, concise 3-4 line professional summary based on the resume
+          atsOptimizationTips: string[]; // 5-7 actionable ATS improvements
+          technicalSkillsAnalysis: {
+            frontend: string[];
+            backend: string[];
+            tools: string[];
+          };
         }
 
         Resume Text:
@@ -247,6 +254,22 @@ function getMockAnalysis(text, jobDesc = "") {
     "Structure your experience section chronologically and keep descriptions focused on achievements rather than day-to-day duties."
   ];
 
+  const atsOptimizationTips = [
+    "Ensure standard section headers like 'Experience' and 'Education' are used so ATS parsers can read them.",
+    "Remove two-column layouts, images, and complex tables which can confuse older ATS software.",
+    "Include your LinkedIn and GitHub URLs in the contact section.",
+    "Tailor your skills section to mirror the exact phrasing used in the job description.",
+    "Save and upload your final resume as a standard PDF to preserve formatting, unless DOCX is explicitly requested."
+  ];
+
+  const professionalSummaryRewrite = "Results-driven Software Engineer with proven experience in architecting scalable solutions and optimizing system performance. Adept at leveraging modern web technologies to drive business growth and enhance user experience. Strong track record of cross-functional collaboration to deliver impactful software on time.";
+
+  const technicalSkillsAnalysis = {
+    frontend: foundKeywords.filter(k => ["react", "vue", "angular", "html", "css", "javascript", "typescript"].includes(k)),
+    backend: foundKeywords.filter(k => ["node.js", "python", "sql", "mongodb"].includes(k)),
+    tools: foundKeywords.filter(k => ["aws", "docker", "kubernetes", "git"].includes(k))
+  };
+
   const qualityScore = Math.min(92, Math.max(55, 60 + foundKeywords.length * 4 - weakBullets.length * 5));
 
   return {
@@ -254,7 +277,10 @@ function getMockAnalysis(text, jobDesc = "") {
     suggestions,
     weakBullets,
     extractedKeywords: foundKeywords.length > 0 ? foundKeywords : ["javascript", "html", "css", "git"],
-    suggestedKeywords: missingKeywords.length > 0 ? missingKeywords : ["next.js", "tailwindcss", "ci/cd"]
+    suggestedKeywords: missingKeywords.length > 0 ? missingKeywords : ["next.js", "tailwindcss", "ci/cd"],
+    professionalSummaryRewrite,
+    atsOptimizationTips,
+    technicalSkillsAnalysis
   };
 }
 

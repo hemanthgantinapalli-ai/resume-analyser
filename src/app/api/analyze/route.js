@@ -4,7 +4,9 @@ import {
   checkFormatting, 
   calculateKeywordMatch, 
   evaluateContentHeuristics,
-  calculateATSScore 
+  calculateATSScore,
+  categorizeSkills,
+  generateFinalVerdict
 } from "@/lib/atsEngine";
 import { analyzeResumeWithAI } from "@/lib/aiEngine";
 import mammoth from "mammoth";
@@ -32,7 +34,6 @@ export async function POST(req) {
 
       try {
         if (fileExtension === "pdf") {
-          // Dynamic import for pdf-parse with multiple fallback strategies
           let pdfParsed = false;
           
           try {
@@ -44,19 +45,14 @@ export async function POST(req) {
             console.warn("pdf-parse primary attempt failed:", pdfError.message);
           }
 
-          // If pdf-parse failed, try a lightweight text extraction from PDF buffer
           if (!pdfParsed || !rawText.trim()) {
             try {
-              // Attempt to extract readable text segments from the PDF binary
               const bufferStr = fileBuffer.toString("utf8");
               const textSegments = [];
-              
-              // Extract text between BT (Begin Text) and ET (End Text) operators
               const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
               let match;
               while ((match = btEtRegex.exec(bufferStr)) !== null) {
                 const block = match[1];
-                // Extract text from Tj and TJ operators
                 const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g);
                 if (tjMatches) {
                   tjMatches.forEach(m => {
@@ -65,7 +61,6 @@ export async function POST(req) {
                   });
                 }
               }
-              
               if (textSegments.length > 5) {
                 rawText = textSegments.join("\n");
                 pdfParsed = true;
@@ -75,7 +70,6 @@ export async function POST(req) {
             }
           }
 
-          // Final check: if we still have no text or the text looks like raw PDF code, fail gracefully
           if (!pdfParsed || !rawText.trim()) {
             return NextResponse.json({
               error: "Could not extract readable text from this PDF. The file may be image-based (scanned) or use an unsupported encoding. Please try uploading a .docx version or a text-based PDF."
@@ -85,7 +79,6 @@ export async function POST(req) {
           const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
           rawText = parsed.value || "";
         } else {
-          // Plain text fallback
           rawText = fileBuffer.toString("utf8");
         }
       } catch (parseError) {
@@ -95,7 +88,6 @@ export async function POST(req) {
         }, { status: 400 });
       }
 
-      // Safety check: detect if extracted text is actually raw PDF source code
       const looksLikePdfSource = (text) => {
         const pdfIndicators = ["%PDF-", "endobj", "endstream", "/Type/Page", "0 obj", "/Font", "/MediaBox"];
         const matchCount = pdfIndicators.filter(indicator => text.includes(indicator)).length;
@@ -108,7 +100,6 @@ export async function POST(req) {
         }, { status: 400 });
       }
     } else {
-      // Direct JSON text testing
       const body = await req.json();
       rawText = body.text || "";
       jobDescription = body.jobDescription || "";
@@ -129,11 +120,8 @@ export async function POST(req) {
     // 4. Job Keyword Extraction & Matching
     let jobKeywords = [];
     if (jobDescription) {
-      // Basic extraction of capital noun words or key technologies from job description
       const jdTechWords = jobDescription.match(/\b(React|Node\.js|Next\.js|Python|Java|SQL|AWS|Docker|Kubernetes|TypeScript|JavaScript|Git|MongoDB|Express|CSS|HTML|Tailwind|Redux|GraphQL|REST API|CI\/CD)\b/gi) || [];
-      // Remove duplicates
       jobKeywords = Array.from(new Set(jdTechWords.map(w => w.toLowerCase())));
-      // Capitalize properly for standard comparison display
       jobKeywords = jobKeywords.map(w => {
         if (w === "javascript") return "JavaScript";
         if (w === "typescript") return "TypeScript";
@@ -149,23 +137,44 @@ export async function POST(req) {
     
     const keywordAnalysis = calculateKeywordMatch(rawText, jobKeywords);
 
-    // 5. Section Checklist Scoring (25 pts per core section present)
-    const coreSections = ["skills", "experience", "projects", "education"];
-    let sectionsFoundCount = 0;
+    // 5. Full Section Checklist (all 5 required sections)
+    const ALL_SECTIONS = ["summary", "skills", "experience", "projects", "education"];
+    const SECTION_TIPS = {
+      summary: "Add a 3–4 line professional summary at the top highlighting your role, tech stack, and career impact.",
+      skills: "Include a dedicated Skills section listing your technical tools, languages, and frameworks.",
+      experience: "Add a Work Experience section with company names, roles, dates, and bullet-pointed achievements.",
+      projects: "Include a Projects section showcasing relevant personal or academic builds with tech stack details.",
+      education: "Add an Education section with your degree, institution, and graduation year."
+    };
+
     const sectionsStatus = {};
-    
-    coreSections.forEach(sec => {
+    const sectionsTips = {};
+    let sectionsFoundCount = 0;
+
+    ALL_SECTIONS.forEach(sec => {
       const hasContent = sections[sec] && sections[sec].trim().length > 10;
       sectionsStatus[sec] = !!hasContent;
+      sectionsTips[sec] = hasContent
+        ? `✓ ${sec.charAt(0).toUpperCase() + sec.slice(1)} section detected with content.`
+        : SECTION_TIPS[sec];
       if (hasContent) sectionsFoundCount++;
     });
-    
-    const sectionsScore = sectionsFoundCount * 25;
+
+    // Score based on all 5 sections (20 pts each)
+    const sectionsScore = Math.min(100, sectionsFoundCount * 20);
 
     // 6. Content Quality Score (Action Verbs and Metrics)
     const contentHeuristics = evaluateContentHeuristics(rawText);
 
-    // 7. Call AI Engine for deep evaluation, suggestions, and weak bullet points
+    // 7. Extract skills from rawText for categorization
+    const skillsSection = sections.skills || "";
+    const rawSkillTokens = skillsSection
+      .split(/[\n,|•·]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 1 && s.length < 40);
+    const categorizedSkills = categorizeSkills(rawSkillTokens);
+
+    // 8. AI Engine — deep evaluation
     let aiFeedback = {
       contentQualityScore: contentHeuristics.score,
       suggestions: contentHeuristics.suggestions,
@@ -177,7 +186,18 @@ export async function POST(req) {
         }
       ],
       extractedKeywords: keywordAnalysis.matched.slice(0, 8),
-      suggestedKeywords: keywordAnalysis.missing.slice(0, 5)
+      suggestedKeywords: keywordAnalysis.missing.slice(0, 12),
+      professionalSummaryRewrite: "Results-driven Software Engineer with proven experience in architecting scalable solutions and optimizing system performance. Adept at leveraging modern web technologies to drive business growth and enhance user experience. Strong track record of cross-functional collaboration to deliver impactful software on time.",
+      atsOptimizationTips: [
+        "Use standard section headers (Experience, Education, Skills) so ATS parsers can correctly identify your sections.",
+        "Remove two-column layouts, images, tables, and headers/footers which confuse older ATS software.",
+        "Include your LinkedIn and GitHub URLs in the contact section.",
+        "Mirror exact phrasing from the job description in your skills and experience sections.",
+        "Save your resume as a text-based PDF — avoid scanned or image-only PDFs.",
+        "Use common bullet point characters (•, -, *) rather than custom icons or shapes.",
+        "Keep font sizes between 10–12pt and use standard fonts (Arial, Calibri, Times New Roman)."
+      ],
+      technicalSkillsAnalysis: categorizedSkills
     };
 
     try {
@@ -188,14 +208,17 @@ export async function POST(req) {
           suggestions: deepAIResult.suggestions?.length ? deepAIResult.suggestions : contentHeuristics.suggestions,
           weakBullets: deepAIResult.weakBullets?.length ? deepAIResult.weakBullets : aiFeedback.weakBullets,
           extractedKeywords: deepAIResult.extractedKeywords?.length ? deepAIResult.extractedKeywords : aiFeedback.extractedKeywords,
-          suggestedKeywords: deepAIResult.suggestedKeywords?.length ? deepAIResult.suggestedKeywords : aiFeedback.suggestedKeywords
+          suggestedKeywords: deepAIResult.suggestedKeywords?.length ? deepAIResult.suggestedKeywords : aiFeedback.suggestedKeywords,
+          professionalSummaryRewrite: deepAIResult.professionalSummaryRewrite || aiFeedback.professionalSummaryRewrite,
+          atsOptimizationTips: deepAIResult.atsOptimizationTips?.length ? deepAIResult.atsOptimizationTips : aiFeedback.atsOptimizationTips,
+          technicalSkillsAnalysis: deepAIResult.technicalSkillsAnalysis || aiFeedback.technicalSkillsAnalysis
         };
       }
     } catch (aiError) {
       console.warn("AI Engine failed, falling back to rule-based and mock AI advice.");
     }
 
-    // 8. Consolidated ATS Score calculation
+    // 9. Consolidated ATS Score
     const finalATSScore = calculateATSScore({
       keywordScore: keywordAnalysis.score,
       formattingScore: formattingAnalysis.score,
@@ -203,16 +226,21 @@ export async function POST(req) {
       contentScore: aiFeedback.contentQualityScore
     });
 
-    // 9. Formulate Response
+    // 10. Final Verdict
+    const finalVerdict = generateFinalVerdict(finalATSScore);
+
+    // 11. Full structured response
     return NextResponse.json({
       fileName,
       wordCount: rawText.split(/\s+/).length,
       atsScore: finalATSScore,
+      finalVerdict,
       breakdown: {
         keywords: {
           score: keywordAnalysis.score,
           matched: keywordAnalysis.matched,
-          missing: keywordAnalysis.missing
+          missing: keywordAnalysis.missing,
+          suggested: aiFeedback.suggestedKeywords
         },
         formatting: {
           score: formattingAnalysis.score,
@@ -226,13 +254,21 @@ export async function POST(req) {
         },
         sections: {
           score: sectionsScore,
-          status: sectionsStatus
+          status: sectionsStatus,
+          tips: sectionsTips
         },
         content: {
           score: aiFeedback.contentQualityScore,
           suggestions: aiFeedback.suggestions,
           weakBullets: aiFeedback.weakBullets
-        }
+        },
+        skills: {
+          categorized: aiFeedback.technicalSkillsAnalysis
+        },
+        summary: {
+          rewrite: aiFeedback.professionalSummaryRewrite
+        },
+        atsTips: aiFeedback.atsOptimizationTips
       },
       parsedText: rawText
     });

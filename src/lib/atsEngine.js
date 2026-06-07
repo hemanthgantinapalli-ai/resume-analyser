@@ -282,3 +282,68 @@ export function calculateATSScore({ keywordScore, formattingScore, sectionsScore
   );
   return Math.min(100, Math.max(0, score));
 }
+
+/**
+ * Categorizes a list of skills into Frontend, Backend, and Tools.
+ * @param {Array<string>} skills
+ * @returns {object} Categorized skills
+ */
+export function categorizeSkills(skills = []) {
+  const categories = {
+    frontend: [],
+    backend: [],
+    tools: []
+  };
+
+  const frontendKeywords = ["react", "vue", "angular", "html", "css", "tailwind", "next.js", "bootstrap", "javascript", "typescript", "sass", "less", "redux", "graphql"];
+  const backendKeywords = ["node.js", "express", "python", "django", "flask", "java", "spring", "c++", "c#", ".net", "php", "laravel", "ruby", "rails", "sql", "mongodb", "postgresql", "mysql", "redis", "rest api", "fastapi", "golang", "go", "rust"];
+  const toolKeywords = ["aws", "docker", "kubernetes", "git", "ci/cd", "linux", "cloud", "azure", "gcp", "agile", "scrum", "testing", "jest", "cypress", "webpack", "babel", "npm", "yarn", "github", "gitlab", "bitbucket", "jira"];
+
+  skills.forEach(skill => {
+    const sLower = skill.toLowerCase();
+    
+    // Check if it belongs to any predefined category
+    if (frontendKeywords.some(kw => sLower.includes(kw))) {
+      categories.frontend.push(skill);
+    } else if (backendKeywords.some(kw => sLower.includes(kw))) {
+      categories.backend.push(skill);
+    } else if (toolKeywords.some(kw => sLower.includes(kw))) {
+      categories.tools.push(skill);
+    } else {
+      // Default to tools if unsure, or you could add an 'other' category. 
+      // Many ambiguous tech skills fall under tools/platforms.
+      categories.tools.push(skill);
+    }
+  });
+
+  return categories;
+}
+
+/**
+ * Generates a final verdict based on the overall ATS score.
+ * @param {number} score 
+ * @returns {object} Final verdict with rating and summary
+ */
+export function generateFinalVerdict(score) {
+  if (score >= 80) {
+    return {
+      rating: "Excellent",
+      summary: "Your resume is highly optimized and ready for top-tier tech applications. It has strong ATS compliance and impactful phrasing."
+    };
+  } else if (score >= 60) {
+    return {
+      rating: "Good",
+      summary: "Your resume is solid but has room for improvement. Focus on quantifying achievements and ensuring all missing keywords are addressed."
+    };
+  } else if (score >= 40) {
+    return {
+      rating: "Average",
+      summary: "Your resume may struggle against strict ATS filters. Address formatting issues, add missing sections, and rewrite weak bullet points."
+    };
+  } else {
+    return {
+      rating: "Poor",
+      summary: "Your resume needs significant revision. Please utilize our Smart Builder or AI Improver to rebuild your resume structure and content."
+    };
+  }
+}
