@@ -8,8 +8,8 @@ import {
   categorizeSkills,
   generateFinalVerdict
 } from "@/lib/atsEngine";
-import { analyzeResumeWithAI } from "@/lib/aiEngine";
-import mammoth from "mammoth";
+import { analyzeResumeWithAI, improveResumeWithAI } from "@/lib/aiEngine";
+import { parseResumeBuffer, buildStructuredResumeText } from "@/lib/resumeParser";
 
 export async function POST(req) {
   try {
@@ -33,53 +33,13 @@ export async function POST(req) {
       const fileExtension = fileName.split(".").pop().toLowerCase();
 
       try {
-        if (fileExtension === "pdf") {
-          let pdfParsed = false;
-          
-          try {
-            const pdf = require("pdf-parse");
-            const parsed = await pdf(fileBuffer);
-            rawText = parsed.text || "";
-            pdfParsed = true;
-          } catch (pdfError) {
-            console.warn("pdf-parse primary attempt failed:", pdfError.message);
-          }
+        const parserResult = await parseResumeBuffer(fileBuffer, fileName);
+        rawText = parserResult.rawText || "";
 
-          if (!pdfParsed || !rawText.trim()) {
-            try {
-              const bufferStr = fileBuffer.toString("utf8");
-              const textSegments = [];
-              const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
-              let match;
-              while ((match = btEtRegex.exec(bufferStr)) !== null) {
-                const block = match[1];
-                const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g);
-                if (tjMatches) {
-                  tjMatches.forEach(m => {
-                    const text = m.match(/\(([^)]*)\)/)?.[1];
-                    if (text && text.trim()) textSegments.push(text.trim());
-                  });
-                }
-              }
-              if (textSegments.length > 5) {
-                rawText = textSegments.join("\n");
-                pdfParsed = true;
-              }
-            } catch (fallbackError) {
-              console.warn("PDF text extraction fallback failed:", fallbackError.message);
-            }
-          }
-
-          if (!pdfParsed || !rawText.trim()) {
-            return NextResponse.json({
-              error: "Could not extract readable text from this PDF. The file may be image-based (scanned) or use an unsupported encoding. Please try uploading a .docx version or a text-based PDF."
-            }, { status: 400 });
-          }
-        } else if (fileExtension === "docx") {
-          const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
-          rawText = parsed.value || "";
-        } else {
-          rawText = fileBuffer.toString("utf8");
+        if (!rawText.trim()) {
+          return NextResponse.json({
+            error: parserResult.error || "Unable to extract readable resume content. Please upload a proper text-based PDF."
+          }, { status: 400 });
         }
       } catch (parseError) {
         console.error("Document parser failed:", parseError);
@@ -113,6 +73,7 @@ export async function POST(req) {
 
     // 2. Section Detection
     const sections = detectSections(rawText);
+    const cleanedText = buildStructuredResumeText(rawText);
 
     // 3. Rule-Based Scoring
     const formattingAnalysis = checkFormatting(rawText, sections);
@@ -218,6 +179,16 @@ export async function POST(req) {
       console.warn("AI Engine failed, falling back to rule-based and mock AI advice.");
     }
 
+    let improvedResume = cleanedText;
+    try {
+      const improvementResult = await improveResumeWithAI(rawText, "technical");
+      if (improvementResult?.improvedText) {
+        improvedResume = improvementResult.improvedText;
+      }
+    } catch (improveError) {
+      console.warn("Improvement AI failed during analysis route:", improveError);
+    }
+
     // 9. Consolidated ATS Score
     const finalATSScore = calculateATSScore({
       keywordScore: keywordAnalysis.score,
@@ -231,10 +202,15 @@ export async function POST(req) {
 
     // 11. Full structured response
     return NextResponse.json({
+      status: "success",
+      message: "Resume parsed and analyzed successfully.",
       fileName,
       wordCount: rawText.split(/\s+/).length,
       atsScore: finalATSScore,
       finalVerdict,
+      cleaned_text: cleanedText,
+      improved_resume: improvedResume,
+      ats_suggestions: aiFeedback.atsOptimizationTips.slice(0, 6),
       breakdown: {
         keywords: {
           score: keywordAnalysis.score,

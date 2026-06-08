@@ -7,8 +7,8 @@ import {
   calculateATSScore 
 } from "@/lib/atsEngine";
 import { improveResumeWithAI } from "@/lib/aiEngine";
+import { parseResumeBuffer } from "@/lib/resumeParser";
 import { dbSaveResume } from "@/lib/db";
-import mammoth from "mammoth";
 
 /**
  * Helper function to calculate ATS score of a given resume text.
@@ -60,55 +60,13 @@ export async function POST(req) {
       const fileExtension = fileName.split(".").pop().toLowerCase();
 
       try {
-        if (fileExtension === "pdf") {
-          let pdfParsed = false;
-          
-          try {
-            const pdf = require("pdf-parse");
-            const parsed = await pdf(fileBuffer);
-            rawText = parsed.text || "";
-            pdfParsed = true;
-          } catch (pdfError) {
-            console.warn("pdf-parse primary attempt failed:", pdfError.message);
-          }
+        const parserResult = await parseResumeBuffer(fileBuffer, fileName);
+        rawText = parserResult.rawText || "";
 
-          // If pdf-parse failed, try a lightweight text extraction from PDF buffer
-          if (!pdfParsed || !rawText.trim()) {
-            try {
-              const bufferStr = fileBuffer.toString("utf8");
-              const textSegments = [];
-              const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
-              let match;
-              while ((match = btEtRegex.exec(bufferStr)) !== null) {
-                const block = match[1];
-                const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g);
-                if (tjMatches) {
-                  tjMatches.forEach(m => {
-                    const text = m.match(/\(([^)]*)\)/)?.[1];
-                    if (text && text.trim()) textSegments.push(text.trim());
-                  });
-                }
-              }
-              
-              if (textSegments.length > 5) {
-                rawText = textSegments.join("\n");
-                pdfParsed = true;
-              }
-            } catch (fallbackError) {
-              console.warn("PDF text extraction fallback failed:", fallbackError.message);
-            }
-          }
-
-          if (!pdfParsed || !rawText.trim()) {
-            return NextResponse.json({
-              error: "Could not extract readable text from this PDF. The file may be image-based (scanned) or use an unsupported encoding. Please try uploading a .docx version or a text-based PDF."
-            }, { status: 400 });
-          }
-        } else if (fileExtension === "docx") {
-          const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
-          rawText = parsed.value || "";
-        } else {
-          rawText = fileBuffer.toString("utf8");
+        if (!rawText.trim()) {
+          return NextResponse.json({
+            error: parserResult.error || "Unable to extract readable resume content. Please upload a proper text-based PDF."
+          }, { status: 400 });
         }
       } catch (parseError) {
         console.error("Document parser failed:", parseError);
