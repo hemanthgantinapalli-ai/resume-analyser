@@ -48,17 +48,6 @@ export async function POST(req) {
         }, { status: 400 });
       }
 
-      const looksLikePdfSource = (text) => {
-        const pdfIndicators = ["%PDF-", "endobj", "endstream", "/Type/Page", "0 obj", "/Font", "/MediaBox"];
-        const matchCount = pdfIndicators.filter(indicator => text.includes(indicator)).length;
-        return matchCount >= 3;
-      };
-
-      if (looksLikePdfSource(rawText)) {
-        return NextResponse.json({
-          error: "The PDF text extraction returned raw PDF code instead of readable content. This usually happens with scanned/image-based PDFs. Please upload a text-based PDF or a .docx file."
-        }, { status: 400 });
-      }
     } else {
       const body = await req.json();
       rawText = body.text || "";

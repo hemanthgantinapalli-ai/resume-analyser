@@ -10,8 +10,13 @@ const PDF_SOURCE_INDICATORS = [
   "/Font",
   "/MediaBox",
   "/Contents",
-  "/Length"
+  "/Length",
+  "stream",
+  "/Filter",
+  "/FlateDecode"
 ];
+
+const PDF_SOURCE_MATCH_THRESHOLD = 2;
 
 const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 const phoneRegex = /\+?[0-9]{1,4}?[-.\s]?\(?[0-9]{1,3}?\)?[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,9}/;
@@ -36,7 +41,7 @@ export function normalizeReadableText(text) {
 export function looksLikePdfSource(text) {
   if (!text || typeof text !== "string") return false;
   const matchCount = PDF_SOURCE_INDICATORS.filter((indicator) => text.includes(indicator)).length;
-  return matchCount >= 2;
+  return matchCount >= PDF_SOURCE_MATCH_THRESHOLD;
 }
 
 export function extractReadableTextFromPdfSource(raw) {
@@ -135,6 +140,16 @@ export async function parseResumeBuffer(fileBuffer, fileName) {
         parsedText = pdfResult?.text || "";
       } catch (pdfError) {
         parseError = pdfError;
+      }
+
+      if (parsedText && looksLikePdfSource(parsedText)) {
+        const fallbackText = extractReadableTextFromPdfSource(fileBuffer.toString("latin1"));
+        if (fallbackText) {
+          parsedText = fallbackText;
+        } else {
+          parseError = parseError || new Error("PDF parser returned raw PDF source instead of readable content.");
+          parsedText = "";
+        }
       }
 
       rawText = normalizeReadableText(parsedText);

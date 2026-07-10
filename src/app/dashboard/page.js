@@ -501,8 +501,8 @@ export default function Dashboard() {
                   A strong 3–4 line summary at the top of your resume dramatically increases ATS match rates and recruiter first impressions.
                 </p>
                 {breakdown.summary?.rewrite ? (
-                  <div className="relative p-5 rounded-xl bg-gradient-to-br from-[#6d4aff]/10 to-[#a855f7]/5 border border-[#6d4aff]/25">
-                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#6d4aff]/60 to-transparent rounded-t-xl" />
+                  <div className="relative p-5 rounded-xl bg-linear-to-brrom-[#6d4aff]/10 to-[#a855f7]/5 border border-[#6d4aff]/25">
+                    <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-[#6d4aff]/60 to-transparent rounded-t-xl" />
                     <div className="flex items-start gap-3 mb-3">
                       <Sparkles className="h-4 w-4 text-[#a78bfa] shrink-0 mt-0.5 animate-pulse" />
                       <span className="text-[10px] font-bold text-[#a78bfa] uppercase tracking-widest">Gemini AI Generated</span>
