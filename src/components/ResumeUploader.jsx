@@ -36,7 +36,7 @@ export default function ResumeUploader() {
       </h2>
       <input
         type="file"
-        accept=".pdf"
+        accept=".pdf,.docx,.txt"
         onChange={(e) => setFile(e.target.files[0])}
         className="block w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
       />
