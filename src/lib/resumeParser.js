@@ -40,8 +40,18 @@ export function normalizeReadableText(text) {
 
 export function looksLikePdfSource(text) {
   if (!text || typeof text !== "string") return false;
-  const matchCount = PDF_SOURCE_INDICATORS.filter((indicator) => text.includes(indicator)).length;
-  return matchCount >= PDF_SOURCE_MATCH_THRESHOLD;
+
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  const matchCount = PDF_SOURCE_INDICATORS.filter((indicator) => trimmed.includes(indicator)).length;
+  if (matchCount >= PDF_SOURCE_MATCH_THRESHOLD) return true;
+
+  const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const pdfLineCount = lines.filter((line) => PDF_SOURCE_LINE_REGEX.test(line)).length;
+  if (lines.length > 0 && pdfLineCount / lines.length >= PDF_SOURCE_LINE_RATIO) return true;
+
+  return false;
 }
 
 export function extractReadableTextFromPdfSource(raw) {
@@ -142,21 +152,24 @@ export async function parseResumeBuffer(fileBuffer, fileName) {
         parseError = pdfError;
       }
 
-      if (parsedText && looksLikePdfSource(parsedText)) {
+      const parsedNormalized = normalizeReadableText(parsedText);
+      const parsedLooksLikePdf = looksLikePdfSource(parsedNormalized);
+      const parsedLooksHuman = looksLikeHumanReadableText(parsedNormalized);
+
+      if (parsedNormalized && parsedLooksHuman && !parsedLooksLikePdf) {
+        rawText = parsedNormalized;
+      } else {
         const fallbackText = extractReadableTextFromPdfSource(fileBuffer.toString("latin1"));
-        if (fallbackText) {
-          parsedText = fallbackText;
+        const normalizedFallback = normalizeReadableText(fallbackText);
+        const fallbackLooksLikePdf = looksLikePdfSource(normalizedFallback);
+        const fallbackLooksHuman = looksLikeHumanReadableText(normalizedFallback);
+
+        if (normalizedFallback && fallbackLooksHuman && !fallbackLooksLikePdf) {
+          rawText = normalizedFallback;
         } else {
-          parseError = parseError || new Error("PDF parser returned raw PDF source instead of readable content.");
-          parsedText = "";
+          parseError = parseError || new Error("Unable to extract readable content from the PDF file.");
+          rawText = "";
         }
-      }
-
-      rawText = normalizeReadableText(parsedText);
-
-      if (!rawText) {
-        const fallbackText = extractReadableTextFromPdfSource(fileBuffer.toString("latin1"));
-        rawText = normalizeReadableText(fallbackText);
       }
     } else if (fileExtension === "docx") {
       const parsed = await mammoth.extractRawText({ buffer: fileBuffer });

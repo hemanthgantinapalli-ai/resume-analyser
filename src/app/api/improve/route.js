@@ -65,7 +65,7 @@ export async function POST(req) {
 
         if (!rawText.trim()) {
           return NextResponse.json({
-            error: parserResult.error || "Unable to extract readable resume content. Please ensure the PDF is text-based (not scanned) or upload a .docx/.txt file."
+            error: parserResult.error || "Unable to extract readable resume content. Please upload a text-based PDF (not a scanned/image-only PDF), DOCX, or TXT file."
           }, { status: 400 });
         }
       } catch (parseError) {
